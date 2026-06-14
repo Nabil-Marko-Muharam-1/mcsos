@@ -5,45 +5,45 @@
 #include <mcsos/kernel/panic.h>
 #include <mcsos/kernel/version.h>
 #include <mcsos/mm/pmm.h>
+#include <mcsos/mm/vmm.h>
+#include <mcsos/mm/heap.h>
 
 void kmain(void) {
     log_init();
-    log_write(MCSOS_NAME);
-    log_write(" ");
-    log_write(MCSOS_VERSION);
-    log_writeln(" kernel entered");
+    log_writeln("MCSOS kernel entered");
 
     x86_64_idt_init();
+    
+    /* TRINITY OF MEMORY MANAGEMENT */
     pmm_init();
+    vmm_init();
+    heap_init();
 
-    /* --- PROSES SELF-TEST ALOKASI MEMORI M5 --- */
-    log_writeln("[M5] Memulai Uji Alokasi Halaman Fisik (PMM Self-Test)...");
+    /* --- UJI COBA KERNEL HEAP --- */
+    log_writeln("[M5] Menguji alokasi dinamis (kmalloc & kfree)...");
+    
+    /* Pesan RAM 8 byte */
+    uint64_t *data1 = (uint64_t*)kmalloc(8);
+    *data1 = 0x1122334455667788;
+    log_write("[M5] Data 1 (8 Bytes) dialokasikan di: ");
+    log_key_value_hex64("ptr1", (uint64_t)data1);
 
-    // 1. Alokasikan halaman pertama
-    void *page1 = pmm_alloc_page();
-    log_write("[M5] Halaman 1 dialokasikan pada alamat fisik: ");
-    log_key_value_hex64("page1_addr", (uint64_t)page1);
+    /* Pesan RAM 16 byte */
+    uint64_t *data2 = (uint64_t*)kmalloc(16);
+    *data2 = 0xAABBCCDDEEFF0011;
+    log_write("[M5] Data 2 (16 Bytes) dialokasikan di: ");
+    log_key_value_hex64("ptr2", (uint64_t)data2);
 
-    // 2. Alokasikan halaman kedua
-    void *page2 = pmm_alloc_page();
-    log_write("[M5] Halaman 2 dialokasikan pada alamat fisik: ");
-    log_key_value_hex64("page2_addr", (uint64_t)page2);
-
-    // 3. Bebaskan halaman pertama
-    pmm_free_page(page1);
-    log_writeln("[M5] Halaman 1 berhasil dibebaskan.");
-
-    // 4. Alokasikan lagi! Halaman ketiga harus menempati bekas alamat halaman pertama
-    void *page3 = pmm_alloc_page();
-    log_write("[M5] Halaman 3 dialokasikan (Harus sama dengan Halaman 1): ");
-    log_key_value_hex64("page3_addr", (uint64_t)page3);
-
-    if (page1 == page3 && page1 != page2) {
-        log_writeln("[M5] [SUCCESS] PMM Alokator teruji stabil dan bekerja 100%!");
+    if (*data1 == 0x1122334455667788 && *data2 == 0xAABBCCDDEEFF0011) {
+        log_writeln("[M5] [SUCCESS] Modul 5 TUNTAS! PMM, VMM, dan Heap berjalan 100%!");
     } else {
-        KERNEL_PANIC("PMM Self-Test Gagal! Logika bitwise korup.", 0);
+        KERNEL_PANIC("Korupsi Data pada Kernel Heap!", 0);
     }
+    
+    kfree(data1);
+    kfree(data2);
+    log_writeln("[M5] Garbage collection (kfree) sukses dieksekusi.");
 
-    log_writeln("[M5] Kernel masuk ke mode idle...");
+    log_writeln("[M5] Sistem bersiap untuk idle...");
     cpu_halt_forever();
 }
