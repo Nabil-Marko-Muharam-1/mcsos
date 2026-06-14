@@ -1,38 +1,28 @@
 OUTPUT_FORMAT(elf64-x86-64)
 ENTRY(kmain)
 
-PHDRS
-{
-    text PT_LOAD FLAGS (5);
-    rodata PT_LOAD FLAGS (4);
-    data PT_LOAD FLAGS (6);
-}
-
 SECTIONS
 {
     . = 0xffffffff80000000;
     _kernel_start = .;
 
-    .text : ALIGN (4096)
-    {
+    .text : ALIGN(0x1000) {
+        KEEP(*(.requests))
         *(.text .text.*)
-    } : text
+    }
 
-    .rodata : ALIGN (4096)
-    {
+    .rodata : ALIGN(0x1000) {
         *(.rodata .rodata.*)
-    } : rodata
+    }
 
-    .data : ALIGN (4096)
-    {
+    .data : ALIGN(0x1000) {
         *(.data .data.*)
-    } : data
+    }
 
-    .bss : ALIGN (4096)
-    {
+    .bss : ALIGN(0x1000) {
         *(COMMON)
         *(.bss .bss.*)
-    } : data
+    }
 
     _kernel_end = .;
 }
