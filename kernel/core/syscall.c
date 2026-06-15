@@ -1,22 +1,25 @@
 #include <stdint.h>
 #include "mcsos/arch/x86_64/msr.h"
+#include "mcsos/fs/fd.h"
+#include "mcsos/fs/ramfs.h"
+
 extern void syscall_entry(void);
 
-static void sys_print(const char *str) {
-    while (*str) {
-        __asm__ volatile ("outb %0, %1" : : "a"(*str), "Nd"((uint16_t)0x3F8));
-        str++;
-    }
-}
-
-void syscall_handler(uint64_t syscall_nr, uint64_t arg1, uint64_t arg2) {
-    (void)arg2;
-    if (syscall_nr == 1) {
-        sys_print((const char *)arg1);
-    } else if (syscall_nr == 2) {
-        sys_print("[KERNEL] Program User memanggil Exit. M7 Sukses 100%!\n");
+// Handler sekarang mengembalikan uint64_t agar %rax di User Space mendapat balikan
+uint64_t syscall_handler(uint64_t sys_nr, uint64_t arg1, uint64_t arg2, uint64_t arg3) {
+    if (sys_nr == 0) {        // SYS_READ
+        return fd_read((int)arg1, (uint8_t *)arg2, arg3);
+    } else if (sys_nr == 1) { // SYS_WRITE
+        return fd_write((int)arg1, (uint8_t *)arg2, arg3);
+    } else if (sys_nr == 2) { // SYS_OPEN
+        vfs_node_t *node = ramfs_create_file((const char *)arg1);
+        if (!node) return -1;
+        return fd_open(node); // Mengembalikan tiket FD ke aplikasi!
+    } else if (sys_nr == 60) { // SYS_EXIT
+        fd_write(1, (uint8_t *)"[KERNEL] Aplikasi User selesai dengan aman. M8 Sukses!\n", 55);
         while(1) { __asm__ volatile("cli; hlt"); }
     }
+    return 0;
 }
 
 void syscall_init(void) {
