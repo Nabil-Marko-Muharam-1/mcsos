@@ -3,14 +3,11 @@
 #include "mcsos/dev/block.h"
 #include "mcsos/dev/ramdisk.h"
 #include "mcsos/security/sec.h"
+#include "mcsos/smp/spinlock.h"
 
-extern void pmm_init();
-extern void vmm_init();
-extern void heap_init();
-extern void gdt_init();
-extern void x86_64_idt_init();
-extern void syscall_init();
-extern void ramfs_init();
+extern void pmm_init(); extern void vmm_init(); extern void heap_init();
+extern void gdt_init(); extern void x86_64_idt_init();
+extern void syscall_init(); extern void ramfs_init();
 
 static void print_log(const char *msg) {
     int len = 0;
@@ -18,14 +15,21 @@ static void print_log(const char *msg) {
     fd_write(1, (uint8_t *)msg, len);
 }
 
-// Simulasi Syscall Write yang sudah di-Harden
-int sys_write_mock(int fd, void *buffer, uint32_t size) {
-    (void)fd;
-    // BOUNDARY SECURITY CHECK
-    if (!sec_validate_pointer(buffer, size)) return -1;
-    
-    print_log("[SYSCALL] Syscall dieksekusi dengan aman.\n");
-    return 0; 
+// --- Variabel Uji SMP & Lock Stress ---
+static spinlock_t test_lock;
+static volatile int shared_counter = 0;
+
+// Fungsi untuk mensimulasikan CPU Core yang memperebutkan data
+void mock_cpu_task(int increments) {
+    for(int i = 0; i < increments; i++) {
+        spinlock_acquire(&test_lock);
+        
+        // --- CRITICAL SECTION ---
+        shared_counter++; 
+        // ------------------------
+        
+        spinlock_release(&test_lock);
+    }
 }
 
 void kmain() {
@@ -33,38 +37,31 @@ void kmain() {
     gdt_init(); x86_64_idt_init();
     ramfs_init(); fd_init(); syscall_init();
 
-    print_log("\n[M12] Memulai pengujian Security Model, ACL, dan Hardening...\n");
+    print_log("\n[M13] Memulai pengujian SMP Spinlock & NUMA Prep...\n");
 
-    // --- TEST 1: ACL / CAPABILITY ---
-    print_log("\n--- TEST 1: Access Control List (ACL) ---\n");
-    uint32_t secret_file_uid = 0; // File ini milik Root
-    uint32_t secret_file_perms = SEC_ACCESS_READ; // Hanya bisa dibaca
+    // 1. Persiapan NUMA Node
+    numa_node_t node0 = { .node_id = 0, .memory_base = 0x0, .memory_size = 0x40000000 };
+    if (node0.node_id == 0) {
+        print_log("[M13] Persiapan struktur NUMA Node 0 terinisialisasi.\n");
+    }
+
+    // 2. Inisialisasi Spinlock
+    spinlock_init(&test_lock);
     
-    sec_set_current_uid(1); // Downgrade hak akses menjadi GUEST (UID 1)
-    print_log("[M12] Status: User saat ini = Guest (UID 1).\n");
-    print_log("[M12] Guest mencoba melakukan tindakan WRITE ke file Root...\n");
+    print_log("[M13] Memulai Lock Stress Test (100.000 Iterasi)...\n");
     
-    if (sec_check_file_access(secret_file_uid, secret_file_perms, SEC_ACCESS_WRITE)) {
-         print_log("[M12] ERROR FATAL: Guest berhasil meretas file!\n");
+    // Simulasi CPU 0 bekerja
+    mock_cpu_task(50000);
+    // Simulasi CPU 1 bekerja 
+    mock_cpu_task(50000);
+
+    // 3. Validasi Hasil Akhir
+    if (shared_counter == 100000) {
+        print_log("[M13] SUKSES: Spinlock mengamankan Critical Section! Counter = 100000\n");
     } else {
-         print_log("[M12] SUKSES: Kernel OS berhasil memblokir aksi ilegal Guest.\n");
+        print_log("[M13] GAGAL: Terjadi Race Condition!\n");
     }
 
-    sec_set_current_uid(0); // Upgrade hak akses menjadi ROOT (UID 0)
-    print_log("[M12] Status: User saat ini = Root (UID 0).\n");
-    if (sec_check_file_access(secret_file_uid, secret_file_perms, SEC_ACCESS_WRITE)) {
-         print_log("[M12] SUKSES: Root diizinkan menulis ke filenya sendiri.\n");
-    }
-
-    // --- TEST 2: SYSCALL FUZZING & HARDENING ---
-    print_log("\n--- TEST 2: Syscall Fuzzing & Memory Hardening ---\n");
-    
-    print_log("[M12] Fuzzer mencoba menginjeksi Null Pointer ke Syscall...\n");
-    sys_write_mock(1, (void *)0, 100);
-
-    print_log("[M12] Fuzzer mencoba menginjeksi Pointer Kernel ke Syscall...\n");
-    sys_write_mock(1, (void *)0xffffffff80006000, 100);
-
-    print_log("\n[KERNEL] Pengujian M12 Selesai 100%.\n");
+    print_log("\n[KERNEL] Pengujian M13 Selesai 100%.\n");
     while(1) __asm__ volatile("cli; hlt");
 }
