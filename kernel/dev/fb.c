@@ -12,21 +12,27 @@ struct limine_framebuffer_response {
     uint64_t revision; uint64_t framebuffer_count;
     struct limine_framebuffer **framebuffers;
 };
+
+// [PERBAIKAN MUTLAK]: Array id harus berjumlah 4!
 struct limine_framebuffer_request {
-    uint64_t id[2]; uint64_t revision;
+    uint64_t id[4]; uint64_t revision;
     struct limine_framebuffer_response *response;
 };
 
-__attribute__((used, section(".data")))
+__attribute__((used, section(".data"), aligned(8)))
 volatile struct limine_framebuffer_request fb_request = {
-    .id = {0x9d5827dcd881dd75, 0xa3148604f6fab11b}, .revision = 0
+    // [PERBAIKAN MUTLAK]: 2 kode pertama adalah Common Magic Limine, 2 kode terakhir adalah Framebuffer Magic!
+    .id = {0xc7b1dd30df4c8b88, 0x0a82e883a194f07b, 0x9d5827dcd881dd75, 0xa3148604f6fab11b},
+    .revision = 0
 };
 
 static struct limine_framebuffer *fb = 0;
 
-void fb_init() {
-    if (fb_request.response == 0 || fb_request.response->framebuffer_count < 1) return;
+int fb_init() {
+    if (fb_request.response == 0) return -1; 
+    if (fb_request.response->framebuffer_count < 1) return -2;
     fb = fb_request.response->framebuffers[0];
+    return 1;
 }
 
 void fb_put_pixel(uint32_t x, uint32_t y, uint32_t color) {

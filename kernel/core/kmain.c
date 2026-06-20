@@ -23,15 +23,23 @@ void kmain() {
 
     print_log("\n[M14] Menginisialisasi Framebuffer & Graphics Console...\n");
 
-    fb_init();
+    int status = fb_init();
     
-    print_log("[M14] Menggambar RGB Visual Regression Test di layar...\n");
-    fb_draw_rect(50, 50, 100, 100, 0x00FF0000); // Merah Solid
-    fb_draw_rect(170, 50, 100, 100, 0x0000FF00); // Hijau Solid
-    fb_draw_rect(290, 50, 100, 100, 0x000000FF); // Biru Solid
-
-    print_log("[M14] Me-render teks grafis (Font Bitmap) ke layar...\n");
-    fb_draw_string("TAPQI OS - M14 GRAPHICS CONSOLE OK!", 50, 180, 0x00FFFFFF, 0x00000000);
+    if (status == 1) {
+        print_log("[M14] SUKSES: Limine memberikan Framebuffer! Menggambar...\n");
+        fb_draw_rect(50, 50, 100, 100, 0x00FF0000); // Merah Solid
+        fb_draw_rect(170, 50, 100, 100, 0x0000FF00); // Hijau Solid
+        fb_draw_rect(290, 50, 100, 100, 0x000000FF); // Biru Solid
+        
+        // --- Perubahan Teks Di Sini! ---
+        fb_draw_string("NABIL OS - M14 GRAPHICS CONSOLE OK!", 50, 180, 0x00FFFFFF, 0x00000000);
+        // ------------------------------
+        
+    } else if (status == -1) {
+        print_log("[M14] GAGAL: Limine mengabaikan request Framebuffer (Response = NULL).\n");
+    } else {
+        print_log("[M14] GAGAL: Resolusi Layar tidak didukung oleh emulator QEMU.\n");
+    }
 
     print_log("\n[KERNEL] Pengujian M14 Selesai 100%. Lihat Jendela QEMU!\n");
     while(1) __asm__ volatile("cli; hlt");
