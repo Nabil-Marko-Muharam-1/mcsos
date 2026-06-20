@@ -4,6 +4,7 @@
 #include "mcsos/dev/ramdisk.h"
 #include "mcsos/security/sec.h"
 #include "mcsos/smp/spinlock.h"
+#include "mcsos/dev/fb.h"
 
 extern void pmm_init(); extern void vmm_init(); extern void heap_init();
 extern void gdt_init(); extern void x86_64_idt_init();
@@ -15,53 +16,23 @@ static void print_log(const char *msg) {
     fd_write(1, (uint8_t *)msg, len);
 }
 
-// --- Variabel Uji SMP & Lock Stress ---
-static spinlock_t test_lock;
-static volatile int shared_counter = 0;
-
-// Fungsi untuk mensimulasikan CPU Core yang memperebutkan data
-void mock_cpu_task(int increments) {
-    for(int i = 0; i < increments; i++) {
-        spinlock_acquire(&test_lock);
-        
-        // --- CRITICAL SECTION ---
-        shared_counter++; 
-        // ------------------------
-        
-        spinlock_release(&test_lock);
-    }
-}
-
 void kmain() {
     pmm_init(); vmm_init(); heap_init();
     gdt_init(); x86_64_idt_init();
     ramfs_init(); fd_init(); syscall_init();
 
-    print_log("\n[M13] Memulai pengujian SMP Spinlock & NUMA Prep...\n");
+    print_log("\n[M14] Menginisialisasi Framebuffer & Graphics Console...\n");
 
-    // 1. Persiapan NUMA Node
-    numa_node_t node0 = { .node_id = 0, .memory_base = 0x0, .memory_size = 0x40000000 };
-    if (node0.node_id == 0) {
-        print_log("[M13] Persiapan struktur NUMA Node 0 terinisialisasi.\n");
-    }
-
-    // 2. Inisialisasi Spinlock
-    spinlock_init(&test_lock);
+    fb_init();
     
-    print_log("[M13] Memulai Lock Stress Test (100.000 Iterasi)...\n");
-    
-    // Simulasi CPU 0 bekerja
-    mock_cpu_task(50000);
-    // Simulasi CPU 1 bekerja 
-    mock_cpu_task(50000);
+    print_log("[M14] Menggambar RGB Visual Regression Test di layar...\n");
+    fb_draw_rect(50, 50, 100, 100, 0x00FF0000); // Merah Solid
+    fb_draw_rect(170, 50, 100, 100, 0x0000FF00); // Hijau Solid
+    fb_draw_rect(290, 50, 100, 100, 0x000000FF); // Biru Solid
 
-    // 3. Validasi Hasil Akhir
-    if (shared_counter == 100000) {
-        print_log("[M13] SUKSES: Spinlock mengamankan Critical Section! Counter = 100000\n");
-    } else {
-        print_log("[M13] GAGAL: Terjadi Race Condition!\n");
-    }
+    print_log("[M14] Me-render teks grafis (Font Bitmap) ke layar...\n");
+    fb_draw_string("TAPQI OS - M14 GRAPHICS CONSOLE OK!", 50, 180, 0x00FFFFFF, 0x00000000);
 
-    print_log("\n[KERNEL] Pengujian M13 Selesai 100%.\n");
+    print_log("\n[KERNEL] Pengujian M14 Selesai 100%. Lihat Jendela QEMU!\n");
     while(1) __asm__ volatile("cli; hlt");
 }
