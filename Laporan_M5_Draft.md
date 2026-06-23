@@ -1,7 +1,7 @@
 # Laporan Praktikum Modul 5: Physical Memory Management, Paging, dan Virtual Memory
 
 **Disusun oleh:**
-* Nama: Nabil (TAPQI)
+* Nama: Nabil
 * NIM: [Isi NIM-mu]
 * Kelas: [Isi Kelasmu]
 
